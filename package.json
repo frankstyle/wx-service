@@ -1,0 +1,41 @@
+{
+  "name": "wx-service",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www"
+  },
+  "dependencies": {
+    "bluebird": "^3.4.6",
+    "body-parser": "^1.12.2",
+    "cookie-parser": "~1.3.4",
+    "cookie-session": "^2.0.0-alpha.1",
+    "debug": "~2.1.1",
+    "ejs": "2.3.1",
+    "express": "^4.12.3",
+    "express-xml-bodyparser": "^0.3.0",
+    "method-override": "^2.3.2",
+    "moment": "^2.14.1",
+    "redis": "^2.6.3",
+    "superagent": "^2.3.0",
+    "underscore": "^1.8.3",
+    "xml2js": "latest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frankstyle/wx-service.git"
+  },
+  "keywords": [
+    "微信支付",
+    "公众号接入",
+    "扫码支付",
+    "API",
+    "封装"
+  ],
+  "author": "frank",
+  "license": "",
+  "bugs": {
+    "url": "https://github.com/frankstyle/wx-service/issues"
+  },
+  "homepage": "https://github.com/frankstyle/wx-service#readme"
+}
