@@ -10,6 +10,18 @@ var debug = require('debug')('WXService');
 var redisClient = require('../redis').redisClient;
 var https = require('https');
 
+// 验证微信公众号接入签名
+function checkSignature(signature, timestamp, nonce, echostr, callback) {
+    var oriStr = [config.TOKEN, timestamp, nonce].sort().join('');
+    var code = crypto.createHash('sha1').update(oriStr).digest('hex');
+    debug('signature code:', code);
+    if (code == signature) {
+        callback(null, echostr);
+    } else {
+        callback('signature invalid to access', null);
+    }
+}
+
 // 获取access_token (已考虑过期问题)用于接口鉴权
 function getAccessToken(callback) {
     redisClient.getAsync(config.ACCESS_TOKEN_NAME).then(function (accessToken) {
@@ -23,6 +35,7 @@ function getAccessToken(callback) {
                 if (!data || !data.access_token) {
                     callback('refresh token failed', null);
                 } else {
+                    debug('get access token from server success');
                     redisClient.msetAsync(config.ACCESS_TOKEN_NAME, data.access_token).catch(console.error);
                     //设置过期时间比微信的过期时间早1分钟,考虑延迟
                     redisClient.expire(config.ACCESS_TOKEN_NAME, parseInt(data.expires_in) - 60);
@@ -54,11 +67,9 @@ function getJsapiTicket(callback) {
                         }
                         else {
                             debug('get jsapi ticket from server success');
-
                             redisClient.msetAsync(config.JSAPI_TICKET_NAME, data.ticket).catch(console.error);
                             //设置过期时间比微信的过期时间早1分钟,考虑延迟
                             redisClient.expire(config.JSAPI_TICKET_NAME, parseInt(data.expires_in) - 60);
-
                             callback(null, data.ticket);
                         }
                     });
@@ -66,23 +77,32 @@ function getJsapiTicket(callback) {
             });
         }
     });
-
 };
 
+//微信公众号接入
+exports.exec = function (request, response, callback) {
+    var params = request.body;
+    debug('server receive message : ' + JSON.stringify(params));
+    if (params.signature) {
+        debug('server access to official account');
+        checkSignature(params.signature, params.timestamp, params.nonce, params.echostr, function (error, result) {
+            response.send(result || error);
+        });
+    } else {
+        debug('receive message from official account');
+        if (params && params.xml) {
+            if (params.xml.MsgType == 'event') {
+                callback(params.xml.Event, params.xml);
+            }
+            else {
+                callback(params.xml.MsgType, params.xml);
+            }
 
-exports.exec = function(params, cb) {
-
-  if (params.signature) {
-    console.log('params.signature:'+params.signature);
-    checkSignature(params.signature, params.timestamp, params.nonce, params.echostr, cb);
-  } else {
-    console.log('receiveMessage');
-    receiveMessage(params, cb)
-  }
-}
-
-exports.sendMessage = function(params, res) {
-  sendMessage(params, res);
+        }
+        else {
+            response.send('unknown message received');
+        }
+    }
 };
 
 //通过scope = snsapi_userinfo 获取用户信息
@@ -328,19 +348,7 @@ function getNonceStr() {
 };
 
 
-// 验证微信公众号接入签名
-var checkSignature = function(signature, timestamp, nonce, echostr, cb) {
-  var oriStr = [config.TOKEN, timestamp, nonce].sort().join('')
-  var code = crypto.createHash('sha1').update(oriStr).digest('hex');
-  debug('code:', code)
-  if (code == signature) {
-    cb(null, echostr);
-  } else {
-    var err = new Error('Unauthorized');
-    err.code = 401;
-    cb(err);
-  }
-}
+
 var emptyResponse = {
   xml:{
             ToUserName: '',
@@ -350,91 +358,6 @@ var emptyResponse = {
             Content: ' '
           }
 }
-// 接收普通消息
-var receiveMessage = function (msg, cb) {
-
-    var result;
-    console.log('receiveMessage msg=' + msg);
-    console.log('msg.xml=' + msg.xml);
-    console.log('msg.xml=' + msg.xml.MsgType);
-
-    var MsgType = msg.xml.MsgType;
-    console.log('MsgType = ' + MsgType);
-
-    if (MsgType === 'event') {
-        var wxEvent = msg.xml.Event;
-        if (wxEvent === 'subscribe') {
-            //如果是订阅消息，发送欢迎信息
-            console.log(msg.xml.FromUserName + "关注了");
-            result = {
-                xml: {
-                    ToUserName: msg.xml.FromUserName,
-                    FromUserName: '' + msg.xml.ToUserName + '',
-                    CreateTime: new Date().getTime(),
-                    MsgType: 'text',
-                    Content: '欢迎关注华狮奖公众号\n\n' +
-                    '免责声明 \n' +
-                    '在接受本公众号服务前，请仔细阅读并同意下面条款： \n\n' +
-                    '1.任何单位或个人因使用公众号中的信息（服务、产品等内容），或据此进行工商行为，而造成损害后果的，本公众号概不负责，亦不会也不能承担任何法律责任。狮友企业间商业行为务必遵循商业规则，自愿独立承担法律责任。\n\n' +
-                    '2.凡以任何方式直接、间接使用本公众号资料者，视为自愿接受本公众号声明的约束。'
-                }
-            }
-            //获取用户信息,保存
-            getSubscribeUserInfo(msg.xml.FromUserName, function (error, data) {
-                if (data) {
-/*
-                    var userQuery = new AV.Query(WeiXinUser);
-                    userQuery.equalTo("openid", data.openid);
-                    userQuery.first().then(function (user, error) {
-                        if (user) {
-                            console.log('resubscribe user...');
-                            user.set('status', 'focused');
-                            user.set('userInfo', data);
-                            user.save();
-                        }
-                        else {
-                            var userInfo = new WeiXinUser();
-                            userInfo.set('openid', data.openid);
-                            userInfo.set('status', 'focused');
-                            userInfo.set('userInfo', data);
-                            userInfo.save();
-                        }
-
-                    });
-*/
-
-                }
-                else {
-                    console.log(error);
-                }
-            });
-
-        } else if (wxEvent === 'unsubscribe') {
-            //用户取消了关注，从数据库中删除
-            console.log(msg.xml.FromUserName + "取消了关注");
-            deleteUserInfo(msg.xml.FromUserName);
-            result = emptyResponse;
-
-        } else {
-            result = emptyResponse;
-        }
-    }
-
-    else {
-        result = {
-            xml: {
-                ToUserName: msg.xml.FromUserName,
-                FromUserName: '' + msg.xml.ToUserName + '',
-                CreateTime: new Date().getTime(),
-                MsgType: 'text',
-                Content: '欢迎来到华狮奖公众号！'
-            }
-        }
-    }
-
-    cb(null, result);
-}
-
 
 function saveWeiXinToken(accesTokenResponse,cb){
   var wx = new WeiXinToken();
@@ -450,42 +373,28 @@ function saveWeiXinToken(accesTokenResponse,cb){
 
 }
 
+// 发送客服消息
+/*
+ {
+ "touser":"OPENID",
+ "msgtype":"text",
+ "text":
+ {
+ "content":"Hello World"
+ }
+ }
+ */
+function sendMessage(messageData, callback) {
+    getAccessToken(function (error, accessToken) {
+        if (accessToken) {
+            WXApi.sendMessage(accessToken, messageData, function (resData, error) {
+                callback(error, resData);
+            });
 
-function sendMessage(req, res) {
-  var reqData = req.body.data;
-  getAccessToken(function (error, data) {
-    if (!error) {
-      var accessToken = config.ACCESS_TOKEN.value;
-      var opt = {
-        method: "POST",
-        hostname: "api.weixin.qq.com",
-        path: "/cgi-bin/message/custom/send?access_token=" + accessToken,
-        headers: {
-          "Content-Type": 'application/json'
+        } else {
+            console.log('can not get access token.', null);
         }
-      };
-      var req = https.request(opt, function (serverFeedback) {
-        if (serverFeedback.statusCode == 200) {
-          var body = "";
-          serverFeedback
-              .on('data', function (data) {
-                body += data;
-              })
-              .on('end', function () {
-                res.status(200).send(body)
-              });
-        }
-        else {
-          console.log('fail to send message.' + reqData);
-          res.send(500, "error");
-        }
-      });
-      req.write(reqData);
-      req.end();
-    } else {
-      console.log('can not get accesstoken.');
-    }
-  });
+    });
 }
 
 function saveUserInfo(userInfoResponse,cb){
@@ -520,31 +429,8 @@ function saveUserInfo(userInfoResponse,cb){
     });*/
 }
 
-function deleteUserInfo(openId){
-/*
-  var query = new AV.Query(WeiXinUser);
-  console.log('准备删除：'+openId);
-  query.equalTo("openid", openId);
-  query.first({
-    success: function(object) {
-      if(!object){
-        console.log('未找到当前的关注的用户数据');
-        return;
-      }
-       object.save({
-           status: 'unfocused'
-       }).then(function () {
-           console.log('更新取消关注的用户'+openId+'成功');
-       });
-    },
-    error: function(error) {
-      alert("Error: " + error.code + " " + error.message);
-    }
-  });
-*/
-
-}
-
+exports.checkSignature = checkSignature;
+exports.sendMessage = sendMessage;
 exports.getNonceStr = getNonceStr;
 exports.getAccessToken = getAccessToken;
 exports.getJsapiTicket = getJsapiTicket;

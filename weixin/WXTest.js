@@ -18,6 +18,47 @@ router.get('/cleanRedis', function (req, res, next) {
     });
 });
 
+//微信接入的url POST
+router.post('/', xmlParser({trim: true, explicitArray: false, normalizeTags:false}), function (req, res) {
+    WXService.exec(req, res, function (messageType, message) {
+        switch (messageType){
+            case config.RECEIVED_MESSAGE_TYPE.EVENT_SUBSCRIBE:
+                res.send({
+                    type: messageType,
+                    message: message
+                });
+                break;
+            case config.RECEIVED_MESSAGE_TYPE.EVENT_UNSUBSCRIBE:
+                res.send({
+                    type: messageType,
+                    message: message
+                });
+                break;
+            case config.RECEIVED_MESSAGE_TYPE.TEXT:
+                res.send({
+                    type: messageType,
+                    message: message
+                });
+                break;
+            default: res.send('send default message');
+        }
+    });
+
+    /*
+     {
+     "type": "text",
+     "message": {
+     "ToUserName": "toUser",
+     "FromUserName": "fromUser",
+     "CreateTime": "1348831860",
+     "MsgType": "text",
+     "Content": "this is a test",
+     "MsgId": "1234567890123456"
+     }
+     }
+     * */
+});
+
 /* 获取接口 access_token */
 router.get('/getAccessToken', function (req, res, next) {
     WXService.getAccessToken(function (error, accessToken) {
