@@ -20,7 +20,7 @@ router.get('/cleanRedis', function (req, res, next) {
 
 //微信接入的url POST
 router.post('/', xmlParser({trim: true, explicitArray: false, normalizeTags:false}), function (req, res) {
-    WXService.exec(req, res, function (messageType, message) {
+    WXService.receiveMessage(req, res, function (messageType, message) {
         switch (messageType){
             case config.RECEIVED_MESSAGE_TYPE.EVENT_SUBSCRIBE:
                 res.send({
@@ -57,6 +57,15 @@ router.post('/', xmlParser({trim: true, explicitArray: false, normalizeTags:fals
      }
      }
      * */
+});
+
+// 接入微信服务器
+router.get('/', function (req, res, next) {
+    var params = req.query;
+        WXService.checkSignature(params.signature, params.timestamp, params.nonce, params.echostr, function (error, result) {
+            res.send(result || error);
+        });
+
 });
 
 /* 获取接口 access_token */

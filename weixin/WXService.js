@@ -80,15 +80,8 @@ function getJsapiTicket(callback) {
 };
 
 //微信公众号接入
-exports.exec = function (request, response, callback) {
+ function receiveMessage (request, response, callback) {
     var params = request.body;
-    debug('server receive message : ' + JSON.stringify(params));
-    if (params.signature) {
-        debug('server access to official account');
-        checkSignature(params.signature, params.timestamp, params.nonce, params.echostr, function (error, result) {
-            response.send(result || error);
-        });
-    } else {
         debug('receive message from official account');
         if (params && params.xml) {
             if (params.xml.MsgType == 'event') {
@@ -97,12 +90,10 @@ exports.exec = function (request, response, callback) {
             else {
                 callback(params.xml.MsgType, params.xml);
             }
-
         }
         else {
             response.send('unknown message received');
         }
-    }
 };
 
 //通过scope = snsapi_userinfo 获取用户信息
@@ -431,6 +422,7 @@ function saveUserInfo(userInfoResponse,cb){
 
 exports.checkSignature = checkSignature;
 exports.sendMessage = sendMessage;
+exports.receiveMessage = receiveMessage;
 exports.getNonceStr = getNonceStr;
 exports.getAccessToken = getAccessToken;
 exports.getJsapiTicket = getJsapiTicket;
