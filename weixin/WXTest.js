@@ -1,6 +1,7 @@
 var router = require('express').Router();
 var crypto = require('crypto');
 var https = require('https');
+var xml2js = require('xml2js');
 var xmlParser = require('express-xml-bodyparser');
 var utils = require('../util/utils');
 var config = require('../config/WXConfig');
@@ -18,54 +19,65 @@ router.get('/cleanRedis', function (req, res, next) {
     });
 });
 
-//微信接入的url POST
+
+/*
+ {
+ "type": "text",
+ "message": {
+ "ToUserName": "toUser",
+ "FromUserName": "fromUser",
+ "CreateTime": "1348831860",
+ "MsgType": "text",
+ "Content": "this is a test",
+ "MsgId": "1234567890123456"
+ }
+ }
+ * */
+//微信接入的url POST 获取message 消息
 router.post('/', xmlParser({trim: true, explicitArray: false, normalizeTags:false}), function (req, res) {
-    WXService.receiveMessage(req, res, function (messageType, message) {
-        switch (messageType){
+    console.log('receive message from post request');
+    WXService.receiveMessage(req.body, function (messageType, message) {
+        res.set('Content-Type', 'text/xml');
+        switch (messageType) {
             case config.RECEIVED_MESSAGE_TYPE.EVENT_SUBSCRIBE:
-                res.send({
-                    type: messageType,
-                    message: message
-                });
+                var xml = getMessage(messageType, message);
+                res.send(xml);
                 break;
             case config.RECEIVED_MESSAGE_TYPE.EVENT_UNSUBSCRIBE:
-                res.send({
-                    type: messageType,
-                    message: message
-                });
+                var xml = getMessage(messageType, message);
+                res.send(xml);
                 break;
             case config.RECEIVED_MESSAGE_TYPE.TEXT:
-                res.send({
-                    type: messageType,
-                    message: message
-                });
+                var xml = getMessage(messageType, message);
+                res.send(xml);
                 break;
-            default: res.send('send default message');
+            default:
+                console.log('send default message');
+                res.send('');
         }
     });
-
-    /*
-     {
-     "type": "text",
-     "message": {
-     "ToUserName": "toUser",
-     "FromUserName": "fromUser",
-     "CreateTime": "1348831860",
-     "MsgType": "text",
-     "Content": "this is a test",
-     "MsgId": "1234567890123456"
-     }
-     }
-     * */
 });
+
+//被动发送消息
+function getMessage(messageType, message) {
+    var params = {};
+    params.xml = {
+        ToUserName: message.FromUserName,
+        FromUserName: message.ToUserName,
+        CreateTime: new Date().getTime(),
+        MsgType: 'text',
+        Content: 'receive message Type :' + messageType
+    }
+    var builder = new xml2js.Builder();
+    return builder.buildObject(params);
+}
 
 // 接入微信服务器
 router.get('/', function (req, res, next) {
     var params = req.query;
-        WXService.checkSignature(params.signature, params.timestamp, params.nonce, params.echostr, function (error, result) {
-            res.send(result || error);
-        });
-
+    WXService.checkSignature(params.signature, params.timestamp, params.nonce, params.echostr, function (error, result) {
+        res.send(result || error);
+    });
 });
 
 /* 获取接口 access_token */

@@ -80,20 +80,19 @@ function getJsapiTicket(callback) {
 };
 
 //微信公众号接入
- function receiveMessage (request, response, callback) {
-    var params = request.body;
-        debug('receive message from official account');
-        if (params && params.xml) {
-            if (params.xml.MsgType == 'event') {
-                callback(params.xml.Event, params.xml);
-            }
-            else {
-                callback(params.xml.MsgType, params.xml);
-            }
+function receiveMessage(params, callback) {
+    debug('receive message from official account');
+    if (params && params.xml) {
+        if (params.xml.MsgType == 'event') {
+            callback(params.xml.Event, params.xml);
         }
         else {
-            response.send('unknown message received');
+            callback(params.xml.MsgType, params.xml);
         }
+    }
+    else {
+        callback(null, null);
+    }
 };
 
 //通过scope = snsapi_userinfo 获取用户信息
@@ -339,31 +338,6 @@ function getNonceStr() {
 };
 
 
-
-var emptyResponse = {
-  xml:{
-            ToUserName: '',
-            FromUserName: '',
-            CreateTime: new Date().getTime(),
-            MsgType: 'text',
-            Content: ' '
-          }
-}
-
-function saveWeiXinToken(accesTokenResponse,cb){
-  var wx = new WeiXinToken();
-  wx.set('token', accesTokenResponse);
-
-  wx.save().then(function(t){
-    console.log('保存Token到数据库成功：'+accesTokenResponse.access_token);
-    cb(null,t.token);
-  },function(error){
-    console.log('保存Token到数据库失败');
-    cb('save error',null);
-  })
-
-}
-
 // 发送客服消息
 /*
  {
@@ -386,38 +360,6 @@ function sendMessage(messageData, callback) {
             console.log('can not get access token.', null);
         }
     });
-}
-
-function saveUserInfo(userInfoResponse,cb){
-/*    var aquery = new AV.Query('WeiXinUser');
-    aquery.equalTo('openId', userInfoResponse.openid);
-    aquery.first().then(function (data) {
-        if (data) {
-            data.save({
-                userInfo: userInfoResponse,
-                status: 'focused'
-            }).then(function () {
-                    console.log('保存用户到数据库成功：'+userInfoResponse.openid);
-                    cb(null,userInfoResponse.openid);
-            }, function () {
-                console.log('保存用户到数据库失败');
-                cb('save userinfo error',null);
-            });
-        } else {
-            var user = new WeiXinUser();
-            user.set('userInfo', userInfoResponse);
-            user.set('openId', userInfoResponse.openid);
-            user.save({
-                status: 'focused'
-            }).then(function(t){
-                console.log('保存用户到数据库成功：'+userInfoResponse.openid);
-                cb(null,userInfoResponse.openid);
-            },function(error){
-                console.log('保存用户到数据库失败');
-                cb('save userinfo error',null);
-            });
-        };
-    });*/
 }
 
 exports.checkSignature = checkSignature;

@@ -8,3 +8,6 @@
 ####执行 ./command 启动应用
     localhost:3000/wx-test/ 进行接口测试
     
+####支持 Leancloud Leanengine 运行
+    安装 leancloud的云引擎,运行 lean up 启动程序
+    
